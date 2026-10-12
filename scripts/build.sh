@@ -9,6 +9,8 @@ image=${IMAGE:-godot-dotnet-web-templates-builder:4.7.2-net10}
 
 "$repo_root/scripts/validate-source.sh" "$source_dir"
 mkdir -p "$output_dir"
+source_dir=$(cd -- "$source_dir" && pwd)
+output_dir=$(cd -- "$output_dir" && pwd)
 docker build --platform linux/amd64 --tag "$image" "$repo_root"
 docker run --rm --platform linux/amd64 \
   --volume "$source_dir:/godot" \
