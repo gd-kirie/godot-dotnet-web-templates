@@ -1,3 +1,6 @@
 .tmp/
 .release/
 dist/
+
+__pycache__/
+*.pyc
