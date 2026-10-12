@@ -31,7 +31,7 @@ done
 
 rm -rf /output/editor
 mkdir -p /output/editor
-install -m 0755 "$editor" /output/editor/
+install -m 0755 "$editor" /output/editor/godot
 cp -a /godot/bin/GodotSharp /output/editor/
-python3 /workspace/scripts/package-release.py /output
-
+python3 /workspace/scripts/package-release.py \
+  /output linux x64 editor/godot editor/GodotSharp

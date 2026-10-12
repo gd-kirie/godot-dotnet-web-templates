@@ -8,8 +8,8 @@ Godot Engine and the generated export templates use the MIT License. The
 
 The build also links components from the .NET runtime. A release workflow must
 include the .NET license and third-party notices with each published release.
+The pinned notices are copied from dotnet/runtime tag `v10.0.12`.
 
 The automation in this repository is experimental. AI agents produced all
 current repository changes. A human has not completed a systematic cleanup or
 security review.
-
