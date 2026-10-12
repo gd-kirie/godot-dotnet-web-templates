@@ -1,0 +1,26 @@
+name: Build experimental templates
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["4.7.2-dotnet10-preview.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - run: ./scripts/prepare-source.sh .tmp/godot
+      - run: ./scripts/build.sh .tmp/godot .tmp/output
+      - uses: actions/upload-artifact@v7
+        with:
+          name: godot-dotnet-web-toolchain
+          path: .tmp/output/dist/*
+      - if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" .tmp/output/dist/* --prerelease --generate-notes

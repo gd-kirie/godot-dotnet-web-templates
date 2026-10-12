@@ -1,0 +1,57 @@
+diff --git a/modules/mono/build_scripts/mono_configure.py b/modules/mono/build_scripts/mono_configure.py
+index 7cc065e5..4ea82470 100644
+--- a/modules/mono/build_scripts/mono_configure.py
++++ b/modules/mono/build_scripts/mono_configure.py
+@@ -81,6 +81,7 @@ def configure(env, env_mono):
+         add_mono_component(env, "diagnostics_tracing", mono_runtime_path)
+         add_mono_component(env, "hot_reload", mono_runtime_path)
+         add_mono_component(env, "marshal-ilgen", mono_runtime_path)
++        env.AppendUnique(LINKFLAGS=[os.path.join(mono_runtime_path, "libmono-profiler-browser.a")])
+ 
+         # WASM additional sources.
+         env_thirdparty = env_mono.Clone()
+@@ -89,7 +90,7 @@ def configure(env, env_mono):
+         if env["dlink_enabled"]:
+             env_thirdparty.Append(CPPDEFINES=["WASM_SUPPORTS_DLOPEN"])
+         env_thirdparty.Prepend(CPPPATH=os.path.join(mono_runtime_path, "include", "wasm"))
+-        get_runtime_pack_project_includes = os.path.join(get_runtime_pack_project_path, "obj", "Release", "net9.0", rid, "wasm", "for-publish")
++        get_runtime_pack_project_includes = os.path.join(get_runtime_pack_project_path, "obj", "Release", "net10.0", rid, "wasm", "for-publish")
+         env_thirdparty.Prepend(CPPPATH=os.path.join(get_runtime_pack_project_includes))
+         env_thirdparty.add_source_files(
+             env.modules_sources,
+diff --git a/modules/mono/mono_gd/gd_mono.cpp b/modules/mono/mono_gd/gd_mono.cpp
+index 8e4cb0ba..e6256cb1 100644
+--- a/modules/mono/mono_gd/gd_mono.cpp
++++ b/modules/mono/mono_gd/gd_mono.cpp
+@@ -101,7 +101,7 @@ mono_assembly_load_from_full_fn mono_assembly_load_from_full = nullptr;
+ 
+ #ifdef WEB_ENABLED
+ extern "C" {
+-void mono_wasm_load_runtime(int debug_level);
++void mono_wasm_load_runtime(int debug_level, int property_count, const char **property_keys, const char **property_values);
+ }
+ #endif
+ #endif // !TOOLS_ENABLED
+@@ -638,7 +638,7 @@ MonoMethod *_initialize_method;
+ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_initialized) {
+ 	mono_install_assembly_preload_hook(&load_assembly_from_pck, nullptr);
+ 
+-	mono_wasm_load_runtime(1);
++	mono_wasm_load_runtime(1, 0, nullptr, nullptr);
+ 
+ 	r_runtime_initialized = true;
+ 
+diff --git a/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj b/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
+index 0bf6f1b0..20f4aa40 100644
+--- a/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
++++ b/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
+@@ -5,7 +5,8 @@
+ <Project Sdk="Microsoft.NET.Sdk">
+ 
+   <PropertyGroup>
+-    <TargetFramework>net9.0</TargetFramework>
++    <TargetFramework>net10.0</TargetFramework>
++    <OutputType>Exe</OutputType>
+   </PropertyGroup>
+ 
+   <!-- This plus a non-empty $(RuntimeIdentifier) are enough to choose Mono. -->
