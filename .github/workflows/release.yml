@@ -18,7 +18,7 @@ jobs:
       - run: ./scripts/build.sh .tmp/godot .tmp/output
       - uses: actions/upload-artifact@v7
         with:
-          name: godot-dotnet-web-toolchain
+          name: godot-dotnet-web-templates
           path: .tmp/output/dist/*
       - if: startsWith(github.ref, 'refs/tags/')
         env:

@@ -44,11 +44,10 @@ manifest = {
 }
 (stage / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
-archive = dist / "godot-dotnet-web-toolchain-4.7.2-net10.zip"
+archive = dist / "godot-dotnet-web-templates-4.7.2-net10.zip"
 with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
     for source in sorted(path for path in stage.rglob("*") if path.is_file()):
         bundle.write(source, source.relative_to(stage))
 
 checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
 (dist / "SHA256SUMS").write_text(f"{checksum}  {archive.name}\n")
-
