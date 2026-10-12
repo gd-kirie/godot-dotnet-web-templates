@@ -32,7 +32,8 @@ The release contains these files:
 
 The template files alone do not add .NET Web support to the official editor.
 A compatible editor and the matching NuGet packages are also necessary.
-The Kirie CLI manages this experimental toolchain through `kirie doctor`.
+The Kirie CLI installs these files and configures a project through
+`kirie doctor`. It does not install the compatible editor.
 
 The current templates have these limits:
 
@@ -62,4 +63,3 @@ Raul Santos authored the upstream Draft implementation. See pull request
 
 Godot uses the MIT License. Release files include the Godot license and
 copyright notices. See [NOTICE.md](NOTICE.md) for more information.
-

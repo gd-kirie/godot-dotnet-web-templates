@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import os
 import pathlib
 import shutil
 import sys
@@ -32,6 +33,7 @@ for source in sorted(path for path in stage.rglob("*") if path.is_file()):
 manifest = {
     "schemaVersion": 1,
     "channel": "experimental-ai-slop",
+    "release": os.environ["RELEASE_TAG"],
     "godotVersion": "4.7.2.stable.mono",
     "godotCommit": "ed1daf0bf001b61586d9930840f2f1394092c079",
     "draftPullRequest": 106125,

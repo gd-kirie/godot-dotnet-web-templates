@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$repo_root/versions.env"
 source_dir=${1:?Usage: build.sh SOURCE_DIR OUTPUT_DIR}
 output_dir=${2:?Usage: build.sh SOURCE_DIR OUTPUT_DIR}
 image=${IMAGE:-godot-dotnet-web-templates-builder:4.7.2-net10}
@@ -14,5 +15,5 @@ docker run --rm --platform linux/amd64 \
   --volume "$repo_root:/workspace:ro" \
   --volume "$output_dir:/output" \
   --env JOBS="${JOBS:-8}" \
+  --env RELEASE_TAG="$RELEASE_TAG" \
   "$image" /workspace/scripts/build-in-container.sh
-
