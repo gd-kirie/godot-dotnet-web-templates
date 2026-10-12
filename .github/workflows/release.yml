@@ -1,20 +1,16 @@
-name: Build experimental toolchains
+name: Build experimental templates
 
 on:
   workflow_dispatch:
   push:
-    tags: ["4.7.2-dotnet10-preview.2"]
+    tags: ["4.7.2-dotnet10-preview.*"]
 
 permissions:
-  contents: read
-
-concurrency:
-  group: toolchain-${{ github.ref }}
-  cancel-in-progress: false
+  contents: write
 
 jobs:
-  linux-x64:
-    runs-on: ubuntu-24.04
+  build:
+    runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
@@ -22,67 +18,14 @@ jobs:
       - run: ./scripts/build.sh .tmp/godot .tmp/output
       - uses: actions/upload-artifact@v7
         with:
-          name: toolchain-linux-x64
+          name: godot-dotnet-web-templates
           path: .tmp/output/dist/*
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v7
-        with:
-          name: shared-web-templates
-          path: .tmp/output/templates
-          if-no-files-found: error
-
-  darwin-arm64:
-    needs: linux-x64
-    runs-on: macos-14
-    timeout-minutes: 240
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.401
-      - uses: actions/download-artifact@v7
-        with:
-          name: shared-web-templates
-          path: .tmp/output/templates
-      - run: ./scripts/prepare-source.sh .tmp/godot
-      - name: Install SCons
-        run: |
-          python3 -m venv .tmp/venv
-          .tmp/venv/bin/pip install 'scons==4.10.1'
-          echo "$PWD/.tmp/venv/bin" >> "$GITHUB_PATH"
-      - run: ./scripts/build-macos.sh .tmp/godot .tmp/output
-      - uses: actions/upload-artifact@v7
-        with:
-          name: toolchain-darwin-arm64
-          path: .tmp/output/dist/*
-          if-no-files-found: error
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [linux-x64, darwin-arm64]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v7
-        with:
-          pattern: toolchain-*
-          path: .tmp/release
-          merge-multiple: true
-      - name: Verify and combine checksums
-        working-directory: .tmp/release
-        run: |
-          cat ./*.zip.sha256 | sort -k2 > SHA256SUMS
-          sha256sum --check SHA256SUMS
-          rm ./*.zip.sha256
-      - name: Create preview release
+      - if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            .tmp/release/*.zip \
-            .tmp/release/SHA256SUMS \
-            --prerelease \
-            --title "Godot 4.7.2 .NET 10 Web toolchain preview 2" \
-            --notes-file docs/release-notes/preview.2.md
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to replace immutable assets: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" .tmp/output/dist/* --prerelease --generate-notes

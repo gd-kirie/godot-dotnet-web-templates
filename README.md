@@ -1,6 +1,6 @@
-# Godot .NET Web toolchains
+# Godot .NET Web templates
 
-This repository builds experimental Web export toolchains for Godot 4.7.2 and
+This repository builds experimental Web export files for Godot 4.7.2 and
 .NET 10.
 
 > [!WARNING]
@@ -17,51 +17,43 @@ This repository builds experimental Web export toolchains for Godot 4.7.2 and
 The build uses only these Godot sources:
 
 - Godot 4.7.2 commit `ed1daf0bf001b61586d9930840f2f1394092c079`.
-- Draft pull request [godotengine/godot#106125](https://github.com/godotengine/godot/pull/106125), commit `aa1f5ffe8321bc57155f606197b5aa93dd9e662c`.
+- Draft pull request
+  [godotengine/godot#106125](https://github.com/godotengine/godot/pull/106125),
+  commit `aa1f5ffe8321bc57155f606197b5aa93dd9e662c`.
 
 The repository does not use a third-party Godot fork or a third-party template.
 It applies a recorded forward port to the official Godot source.
 
-## Planned Kirie install
+## Scope
 
-The preview 2 archive layout is designed for `kirie doctor fix`. When preview 2
-is published, a Godot project that uses C# and targets Web can run:
+A release archive contains these files:
 
-```sh
-kirie doctor fix
-```
-
-The fix downloads the matching platform asset, verifies `SHA256SUMS` and the
-file hashes in `manifest.json`, then installs the toolchain in the Kirie cache.
-It includes the editor. Users do not need to clone Godot or compile it.
-The installer must make `manifest.editor.path` executable after extraction.
-
-The official Godot 4.7.2 .NET editor still rejects Web export. Kirie uses the
-editor in this toolchain only for the experimental Web export.
-
-## Supported hosts
-
-| Host | Release asset | Editor path |
-| --- | --- | --- |
-| macOS Apple Silicon | `godot-dotnet-web-4.7.2-net10-darwin-arm64.zip` | `editor/Godot.app/Contents/MacOS/Godot` |
-| Linux x64 | `godot-dotnet-web-4.7.2-net10-linux-x64.zip` | `editor/godot` |
-
-The macOS app has an ad hoc signature. It is not notarized. Intel macOS,
-Windows, and Linux arm64 are not supported by preview 2.
-
-Each platform archive contains:
-
-- The patched Godot editor and its matching `GodotSharp` directory.
-- `templates/web_debug.zip` and `templates/web_release.zip`.
-- Four matching local Godot NuGet packages in `nuget/`.
-- `patch-export.py`, which performs the post-export change required by the
+- `web_debug.zip` and `web_release.zip`.
+- Four matching local Godot NuGet packages.
+- `patch-export.py`, which applies the remaining post-export change from the
   upstream Draft.
-- License notices and a schema v2 `manifest.json`.
+- Godot and .NET license notices.
+- A manifest and SHA-256 checksums.
 
-`SHA256SUMS` in the GitHub Release verifies the complete archives. The manifest
-contains the editor, template, NuGet package, and patch paths and SHA-256 hashes.
+The archive does not contain a custom Godot editor. Users and this repository
+do not compile one.
 
-The current toolchains have these limits:
+Kirie performs .NET Web export as separate, reproducible steps:
+
+1. The Kirie CLI runs `dotnet publish` for `browser-wasm` outside Godot with
+   the patched local SDK and verifies the output with a SHA-512 manifest.
+2. The user's existing configured official Godot Mono/.NET editor runs
+   `--export-pack Web`.
+3. Kirie's GDScript export plugin adds the `dotnet` feature, a C# stub, and
+   `res://.godot/mono/publish/wasm32` to the PCK during that pack export.
+4. The CLI assembles the HTML, JavaScript, WebAssembly, and PCK files outside
+   Godot from the custom template, then applies the recorded post-export patch.
+
+`kirie doctor fix` can install the matching templates, NuGet packages, and
+patch in the Kirie cache. It does not replace the user's Godot editor or
+install a second editor.
+
+The current templates have these limits:
 
 - They use WebAssembly without threads.
 - They use `optimize=none` and `lto=none`.
@@ -70,7 +62,7 @@ The current toolchains have these limits:
 - Only Chromium has browser test evidence.
 - Some .NET browser APIs do not work.
 
-## Build Linux x64
+## Build
 
 Install Docker. Then run:
 
@@ -79,27 +71,17 @@ Install Docker. Then run:
 ./scripts/build.sh .tmp/godot .tmp/output
 ```
 
-The build uses fixed container digests and fixed source commits. It validates
-the patched source tree before it starts compilation.
-
-## Build macOS arm64
-
-Install Xcode, Python, SCons 4.10.1, and .NET SDK 10.0.401. Build the Web
-templates on Linux first and put them in `.tmp/output/templates`. Then run:
-
-```sh
-./scripts/prepare-source.sh .tmp/godot
-./scripts/build-macos.sh .tmp/godot .tmp/output
-```
-
-The release workflow performs both platform builds. A tag named
-`4.7.2-dotnet10-preview.2` creates the preview 2 Release only after both assets
-exist and their outer checksums pass.
+The build uses fixed container digests, source commits, and tool versions. It
+validates the patched source tree before compilation. The container downloads
+the official precompiled Godot 4.7.2 .NET Linux editor and verifies its SHA-256
+digest. The build uses that editor only to generate managed glue and NuGet
+packages. It does not include the editor in the release archive.
 
 ## Provenance
 
 Raul Santos authored the upstream Draft implementation. See pull request
 [godotengine/godot#106125](https://github.com/godotengine/godot/pull/106125).
 
-Godot uses the MIT License. Release files include the Godot license and
-copyright notices. See [NOTICE.md](NOTICE.md) for more information.
+Godot uses the MIT License. The templates also include .NET runtime components.
+Release files include the applicable Godot and .NET license and copyright
+notices. See [NOTICE.md](NOTICE.md) for more information.

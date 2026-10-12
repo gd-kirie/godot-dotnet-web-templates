@@ -9,16 +9,15 @@ mkdir -p "$cache" "$nuget" "$templates"
 export NUGET_PACKAGES=$cache/nuget-packages
 export NUGET_HTTP_CACHE_PATH=$cache/nuget-http-cache
 
-editor=/godot/bin/godot.linuxbsd.editor.x86_64.mono
-if [[ ! -x "$editor" ]]; then
-  scons platform=linuxbsd target=editor arch=x86_64 module_mono_enabled=yes \
-    wayland=no accesskit=no debug_symbols=no -j"$jobs"
-fi
+editor=/opt/godot/godot
+editor_data=/output/editor-data
+test -x "$editor"
 
 if [[ ! -f "$nuget/Godot.NET.Sdk.4.7.2.nupkg" ]]; then
   "$editor" --headless --generate-mono-glue ./modules/mono/glue
   ./modules/mono/build_scripts/build_assemblies.py \
-    --godot-output-dir=./bin --godot-platform=linuxbsd --push-nupkgs-local="$nuget"
+    --godot-output-dir="$editor_data" --godot-platform=linuxbsd \
+    --push-nupkgs-local="$nuget"
 fi
 
 for mode in debug release; do
@@ -29,9 +28,4 @@ for mode in debug release; do
     "$templates/web_${mode}.zip"
 done
 
-rm -rf /output/editor
-mkdir -p /output/editor
-install -m 0755 "$editor" /output/editor/godot
-cp -a /godot/bin/GodotSharp /output/editor/
-python3 /workspace/scripts/package-release.py \
-  /output linux x64 editor/godot editor/GodotSharp
+python3 /workspace/scripts/package-release.py /output
