@@ -55,12 +55,60 @@ install a second editor.
 
 The current templates have these limits:
 
-- They use WebAssembly without threads.
+- They require WebAssembly threads and cross-origin isolation.
 - They use `optimize=none` and `lto=none`.
 - They target .NET 10.
 - They use invariant globalization.
 - Only Chromium has browser test evidence.
 - Some .NET browser APIs do not work.
+
+## Threaded exports
+
+Both templates use `threads=yes` and the .NET multithreaded runtime.
+The SDK sets `WasmEnableThreads=true`. The release manifest declares
+`threadSupport=true`. This repository no longer builds a single-threaded variant.
+
+The template defaults to 24 Emscripten workers and 4 Godot workers.
+The Emscripten pool serves both Godot and Mono. A pool of 8 exhausted the workers
+in the smoke test. Larger workloads can require a larger pool.
+
+For export presets, set `variant/thread_support=true`,
+`threads/emscripten_pool_size=24`, and `threads/godot_pool_size=4`.
+For a custom JavaScript host, use `emscriptenPoolSize: 24` and `godotPoolSize: 4`.
+The `scripts/configure-export.gd` script sets these preset values.
+
+Serve the export through HTTPS or localhost with these response headers:
+
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+The page must report `crossOriginIsolated === true`.
+Cross-origin resources must also meet the browser's CORS or CORP requirements.
+
+Install the matching templates, SDK packages, and `patch-export.py` together.
+The NuGet version remains `4.7.2`. An existing NuGet cache can contain the previous
+single-threaded SDK under that version. When you switch releases, use a fresh
+`NUGET_PACKAGES` directory. Then restore and publish the project again.
+
+The `smoke/` project checks `Thread` and `Task.Run` against a known sum and logs
+`THREAD_PROBE_PASS` with their managed thread IDs. Its interactive demo also runs
+two CPU tasks while the main thread updates the UI. It supports cancellation and
+restart. The progress bars show elapsed time, and the counters show actual work.
+
+On 2026-10-13, Debug and Release passed these checks in Chromium through
+Playwright: known sums, distinct worker IDs, UI clicks during computation,
+completion, cancellation, restart, and page reload. The host used the template's
+default worker pool. Firefox, Safari, and the full Kirie export flow remain untested
+with these threaded templates.
+
+Only the main thread modifies Godot objects. Background threads submit plain
+data through `Volatile` and `Interlocked`. These tests do not establish support
+for all .NET browser APIs or measure parallel speedup.
+
+Chromium logs an Emscripten main-thread blocking warning during restart.
+The tested runs continued without a hang.
 
 ## Build
 

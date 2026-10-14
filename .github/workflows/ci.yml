@@ -13,5 +13,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: ./scripts/prepare-source.sh .tmp/godot
-

@@ -1,0 +1,81 @@
+diff --git a/modules/mono/build_scripts/mono_configure.py b/modules/mono/build_scripts/mono_configure.py
+index 4ea8247..baa43ad 100644
+--- a/modules/mono/build_scripts/mono_configure.py
++++ b/modules/mono/build_scripts/mono_configure.py
+@@ -22,6 +22,11 @@ def configure(env, env_mono):
+         env_mono.Append(CPPDEFINES=["GD_MONO_HOT_RELOAD"])
+ 
+     if env["platform"] == "web":
++        if not env["threads"]:
++            raise RuntimeError("The .NET Web runtime requires threads=yes.")
++        # Mono requires a nonzero stack bottom. At -O0, Emscripten otherwise
++        # uses a stack-first layout with address zero as the stack bottom.
++        env.Append(LINKFLAGS=["-sGLOBAL_BASE=1024"])
+         rid = get_rid(env["platform"], env["arch"])
+ 
+         this_script_dir = os.path.dirname(os.path.realpath(__file__))
+diff --git a/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets b/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
+index 1cbcf90..b5423f5 100644
+--- a/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
++++ b/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
+@@ -9,7 +9,7 @@
+ 
+   <!-- Configuration for the Mono WASM runtime. Must match the features enabled on GetRuntimePack.csproj. -->
+   <PropertyGroup>
+-    <WasmEnableThreads>false</WasmEnableThreads>
++    <WasmEnableThreads>true</WasmEnableThreads>
+     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+     <WasmEnableSIMD>true</WasmEnableSIMD>
+   </PropertyGroup>
+diff --git a/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj b/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
+index 20f4aa4..5171cf2 100644
+--- a/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
++++ b/modules/mono/runtime/GetRuntimePack/GetRuntimePack.csproj
+@@ -22,7 +22,7 @@
+ 
+   <!-- Configuration for the Mono WASM runtime. Must match the features supported by the Godot build. -->
+   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+-    <WasmEnableThreads>false</WasmEnableThreads>
++    <WasmEnableThreads>true</WasmEnableThreads>
+     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+     <WasmEnableSIMD>true</WasmEnableSIMD>
+   </PropertyGroup>
+diff --git a/platform/web/detect.py b/platform/web/detect.py
+index 6a7067b..7a3d3de 100644
+--- a/platform/web/detect.py
++++ b/platform/web/detect.py
+@@ -277,7 +277,7 @@ def configure(env: "SConsEnvironment"):
+         env.Append(CCFLAGS=["-sUSE_PTHREADS=1"])
+         env.Append(LINKFLAGS=["-sUSE_PTHREADS=1"])
+         env.Append(LINKFLAGS=["-sDEFAULT_PTHREAD_STACK_SIZE=%sKB" % env["default_pthread_stack_size"]])
+-        env.Append(LINKFLAGS=["-sPTHREAD_POOL_SIZE=\"Module['emscriptenPoolSize']||8\""])
++        env.Append(LINKFLAGS=["-sPTHREAD_POOL_SIZE=\"Module['emscriptenPoolSize']||24\""])
+         env.Append(LINKFLAGS=["-sWASM_MEM_MAX=2048MB"])
+         if not env["dlink_enabled"]:
+             # Workaround https://github.com/emscripten-core/emscripten/issues/21844#issuecomment-2116936414.
+diff --git a/platform/web/export/export_plugin.cpp b/platform/web/export/export_plugin.cpp
+index 4a3dd1d..4ec0294 100644
+--- a/platform/web/export/export_plugin.cpp
++++ b/platform/web/export/export_plugin.cpp
+@@ -392,7 +392,7 @@ void EditorExportPlatformWeb::get_export_options(List<ExportOption> *r_options)
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "progressive_web_app/icon_512x512", PROPERTY_HINT_FILE, "*.png,*.webp,*.svg"), ""));
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::COLOR, "progressive_web_app/background_color", PROPERTY_HINT_COLOR_NO_ALPHA), Color()));
+ 
+-	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/emscripten_pool_size"), 8));
++	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/emscripten_pool_size"), 24));
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/godot_pool_size"), 4));
+ }
+ 
+diff --git a/platform/web/js/engine/config.js b/platform/web/js/engine/config.js
+index d867376..06705ab 100644
+--- a/platform/web/js/engine/config.js
++++ b/platform/web/js/engine/config.js
+@@ -137,7 +137,7 @@ const InternalConfig = function (initConfig) { // eslint-disable-line no-unused-
+ 		 * @ignore
+ 		 * @type {number}
+ 		 */
+-		emscriptenPoolSize: 8,
++		emscriptenPoolSize: 24,
+ 		/**
+ 		 * @ignore
+ 		 * @type {number}

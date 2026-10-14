@@ -51,7 +51,7 @@ manifest = {
     "draftPullRequest": 106125,
     "draftCommit": "aa1f5ffe8321bc57155f606197b5aa93dd9e662c",
     "targetFramework": "net10.0",
-    "threadSupport": False,
+    "threadSupport": True,
     "extensionsSupport": False,
     "optimized": False,
     "files": files,
