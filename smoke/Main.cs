@@ -52,7 +52,7 @@ public partial class Main : Control
     private readonly Label[] _names = new Label[2];
     private readonly Label[] _details = new Label[2];
     private readonly ProgressBar[] _bars = new ProgressBar[2];
-    private Work[] _work = { new(12000), new(16000) };
+    private Work[] _work = { new(4000), new(6000) };
     private Label _heartbeat = null!, _status = null!;
     private ProgressBar _pulse = null!;
     private Button _start = null!, _cancel = null!, _click = null!;
@@ -81,7 +81,7 @@ public partial class Main : Control
         _mainId = Environment.CurrentManagedThreadId;
         Place(new ColorRect { Color = new Color("101827"), MouseFilter = MouseFilterEnum.Ignore }, 0, 0, 960, 540);
         TextAt("Two C# workers. One responsive UI.", 24, 32);
-        TextAt("Real CPU work: xorshift calculations for 12 s / 16 s. Progress = elapsed budget.", 68, 17, "9aa8bc");
+        TextAt("Real CPU work: xorshift calculations for 4 s / 6 s. Progress = elapsed budget.", 68, 17, "9aa8bc");
         _heartbeat = TextAt("", 103, 18, "8bd5ff");
         _pulse = Place(new ProgressBar { ShowPercentage = false }, 48, 137, 864, 8);
         for (int i = 0; i < 2; i++)
@@ -113,7 +113,7 @@ public partial class Main : Control
     private void StartWork()
     {
         if (_running) return;
-        _work = new[] { new Work(12000), new Work(16000) };
+        _work = new[] { new Work(4000), new Work(6000) };
         _running = true;
         _start.Disabled = true;
         _cancel.Disabled = false;
