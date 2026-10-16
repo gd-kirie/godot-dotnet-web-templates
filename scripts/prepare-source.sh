@@ -18,6 +18,7 @@ git -C "$source_dir" checkout --detach "$GODOT_COMMIT"
 git -C "$source_dir" apply "$repo_root/patches/official-draft-forward-port.patch"
 git -C "$source_dir" apply "$repo_root/patches/net10.patch"
 git -C "$source_dir" apply "$repo_root/patches/threads.patch"
+git -C "$source_dir" apply "$repo_root/patches/js-host.patch"
 
 cat > "$source_dir/.godot-dotnet-web-source" <<EOF
 godot_repository=https://github.com/godotengine/godot.git

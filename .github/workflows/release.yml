@@ -16,6 +16,19 @@ jobs:
       - uses: actions/checkout@v6
       - run: ./scripts/prepare-source.sh .tmp/godot
       - run: ./scripts/build.sh .tmp/godot .tmp/output
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - name: Browser acceptance (Debug and Release)
+        run: |
+          python3 scripts/serve.py .tmp/output/smoke &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          npm run test:browser -- http://127.0.0.1:8765/debug/game.html
+          npm run test:browser -- http://127.0.0.1:8765/release/game.html
       - uses: actions/upload-artifact@v7
         with:
           name: godot-dotnet-web-templates
