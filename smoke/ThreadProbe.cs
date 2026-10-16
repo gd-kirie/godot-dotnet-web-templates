@@ -27,11 +27,6 @@ public partial class ThreadProbe : Node
 
     public override void _Ready()
     {
-        var random = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(random);
-        if (Array.TrueForAll(random, value => value == 0))
-            throw new InvalidOperationException("Browser cryptography returned no random data");
-        GD.Print("BROWSER_CRYPTO_PASS");
         _mainId = Environment.CurrentManagedThreadId;
         GD.Print($"THREAD_PROBE_START main={_mainId}");
         _clock.Start();

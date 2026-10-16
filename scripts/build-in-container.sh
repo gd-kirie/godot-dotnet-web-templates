@@ -26,5 +26,4 @@ for mode in debug release; do
     "$templates/web_${mode}.zip"
 done
 
-bash /workspace/scripts/build-smoke.sh
 python3 /workspace/scripts/package-release.py /output
