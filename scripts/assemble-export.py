@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble a Godot .NET Web export without rewriting generated JavaScript."""
+"""Assemble a Godot .NET Web export."""
 import argparse
 import base64
 import hashlib
