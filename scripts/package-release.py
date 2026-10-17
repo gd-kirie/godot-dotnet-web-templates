@@ -19,7 +19,7 @@ for source in [output / "templates" / "web_debug.zip", output / "templates" / "w
     shutil.copy2(source, stage / source.name)
 for source in sorted((output / "nuget").glob("Godot*.4.7.2.nupkg")):
     shutil.copy2(source, stage / source.name)
-shutil.copy2("/workspace/scripts/patch-export.py", stage / "patch-export.py")
+shutil.copy2("/workspace/scripts/assemble-export.py", stage / "assemble-export.py")
 shutil.copytree("/workspace/licenses", stage / "licenses")
 
 required_packages = {
@@ -52,6 +52,8 @@ manifest = {
     "draftCommit": "aa1f5ffe8321bc57155f606197b5aa93dd9e662c",
     "targetFramework": "net10.0",
     "threadSupport": True,
+    "dotnetHost": "standard",
+    "runtimeVersion": "10.0.12",
     "extensionsSupport": False,
     "optimized": False,
     "files": files,

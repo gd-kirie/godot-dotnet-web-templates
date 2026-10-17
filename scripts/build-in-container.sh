@@ -22,7 +22,7 @@ for mode in debug release; do
   rm -f "bin/godot.web.template_${mode}.wasm32.mono.zip"
   scons platform=web target="template_${mode}" arch=wasm32 module_mono_enabled=yes \
     threads=yes debug_symbols=no optimize=none lto=none -j"$jobs"
-  install -m 0644 "bin/godot.web.template_${mode}.wasm32.mono.zip" \
+  python3 /workspace/scripts/build-dotnet-template.py /godot "$mode" \
     "$templates/web_${mode}.zip"
 done
 

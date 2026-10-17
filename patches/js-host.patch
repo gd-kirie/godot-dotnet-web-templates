@@ -1,0 +1,205 @@
+diff --git a/modules/mono/build_scripts/mono_configure.py b/modules/mono/build_scripts/mono_configure.py
+index baa43ad..9c3cc66 100644
+--- a/modules/mono/build_scripts/mono_configure.py
++++ b/modules/mono/build_scripts/mono_configure.py
+@@ -1,4 +1,5 @@
+ import os
++import json
+ import os.path
+ import shutil
+ 
+@@ -108,6 +109,18 @@ def configure(env, env_mono):
+         )
+ 
+         env.AddJSLibraries([os.path.join(mono_runtime_path, "src", "es6", "dotnet.es6.lib.js")])
++        env.AddJSPre(["#modules/mono/runtime/web-host.pre.js"])
++        env.Append(LINKFLAGS=["-sALLOW_TABLE_GROWTH=1"])
++        env.AddJSPost(["#modules/mono/runtime/web-host.post.js"])
++        env.AppendUnique(EXPORTED_RUNTIME_METHODS=["PThread", "wasmMemory", "wasmTable"])
++        env.AppendUnique(EXPORTED_FUNCTIONS=["_mono_wasm_load_runtime", "_pthread_self", "__emscripten_thread_init"])
++        env["ENV"]["WASM_ENABLE_SIMD"] = "1"
++        env["ENV"]["WASM_ENABLE_EH"] = "1"
++        with open(os.path.join(mono_runtime_path, "src", "wasm-props.json")) as properties:
++            runtime_properties = json.load(properties)["items"]
++        env.AppendUnique(EXPORTED_RUNTIME_METHODS=runtime_properties["EmccDefaultExportedRuntimeMethods"])
++        env.AppendUnique(EXPORTED_FUNCTIONS=runtime_properties["EmccDefaultExportedFunctions"])
++
+ 
+ 
+ """
+diff --git a/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets b/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
+index b5423f5..2fb6360 100644
+--- a/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
++++ b/modules/mono/editor/Godot.NET.Sdk/Godot.NET.Sdk/Sdk/Browser.targets
+@@ -10,6 +10,7 @@
+   <!-- Configuration for the Mono WASM runtime. Must match the features enabled on GetRuntimePack.csproj. -->
+   <PropertyGroup>
+     <WasmEnableThreads>true</WasmEnableThreads>
++    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
+     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+     <WasmEnableSIMD>true</WasmEnableSIMD>
+   </PropertyGroup>
+diff --git a/modules/mono/mono_gd/gd_mono.cpp b/modules/mono/mono_gd/gd_mono.cpp
+index e6256cb..f224505 100644
+--- a/modules/mono/mono_gd/gd_mono.cpp
++++ b/modules/mono/mono_gd/gd_mono.cpp
+@@ -638,7 +638,7 @@ MonoMethod *_initialize_method;
+ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_initialized) {
+ 	mono_install_assembly_preload_hook(&load_assembly_from_pck, nullptr);
+ 
+-	mono_wasm_load_runtime(1, 0, nullptr, nullptr);
++	// The JavaScript .NET host initializes Mono before Godot starts.
+ 
+ 	r_runtime_initialized = true;
+ 
+diff --git a/modules/mono/runtime/web-host.post.js b/modules/mono/runtime/web-host.post.js
+new file mode 100644
+index 0000000..4081feb
+--- /dev/null
++++ b/modules/mono/runtime/web-host.post.js
+@@ -0,0 +1,5 @@
++if (ENVIRONMENT_IS_PTHREAD) {
++  // .NET wraps this exported function to establish its thread identity.
++  // Emscripten 4's in-module worker dispatcher otherwise calls the local binding.
++  __emscripten_thread_init = (...args) => Module.__emscripten_thread_init(...args);
++}
+diff --git a/modules/mono/runtime/web-host.pre.js b/modules/mono/runtime/web-host.pre.js
+new file mode 100644
+index 0000000..dde686c
+--- /dev/null
++++ b/modules/mono/runtime/web-host.pre.js
+@@ -0,0 +1,28 @@
++Module = moduleArg(Module);
++ENVIRONMENT_IS_PTHREAD = !!Module.ENVIRONMENT_IS_PTHREAD;
++const startupMethod = ENVIRONMENT_IS_PTHREAD ? "configureWorkerStartup" : "configureEmscriptenStartup";
++const configureDotnetStartup = Module.__dotnet_runtime[startupMethod];
++Module.__dotnet_runtime[startupMethod] = function(module) {
++  configureDotnetStartup(module);
++  const instantiate = module.instantiateWasm;
++  module.instantiateWasm = function(imports, receiveInstance) {
++    // .NET 10 waits for preInit before instantiating; Emscripten 4 awaits
++    // instantiation before running preInit. Preserve .NET's startup order.
++    if (ENVIRONMENT_IS_PTHREAD) {
++      // The .NET host supplies the compiled module to its own instantiate callback.
++      wasmModuleReceived = function() {};
++      self.onmessage({ data: module.godotWorkerLoad });
++      imports.env.memory = wasmMemory;
++      module.wasmMemory = wasmMemory;
++      module.__emscripten_thread_init = (...args) => wasmExports._emscripten_thread_init(...args);
++    }
++    const callbacks = module.preInit;
++    module.preInit = [];
++    for (const callback of callbacks) callback();
++    return instantiate(imports, (instance, compiledModule) => {
++      const dotnetThreadInit = module.__emscripten_thread_init;
++      receiveInstance(instance, compiledModule);
++      if (ENVIRONMENT_IS_PTHREAD) module.__emscripten_thread_init = dotnetThreadInit;
++    });
++  };
++};
+diff --git a/platform/web/SCsub b/platform/web/SCsub
+index c5c0680..158a013 100644
+--- a/platform/web/SCsub
++++ b/platform/web/SCsub
+@@ -117,10 +117,7 @@ externs = [env.File("#platform/web/js/engine/engine.externs.js")]
+ js_engine = env.CreateEngineFile("#bin/godot${PROGSUFFIX}.engine.js", engine, externs, env["threads"])
+ env.Depends(js_engine, externs)
+ 
+-wrap_list = [
+-    build[0],
+-    js_engine,
+-]
++wrap_list = [js_engine] if env["module_mono_enabled"] else [build[0], js_engine]
+ js_wrapped = env.NoCache(
+     env.Textfile("#bin/godot", [env.File(f) for f in wrap_list], TEXTFILESUFFIX="${PROGSUFFIX}.wrapped.js")
+ )
+diff --git a/platform/web/detect.py b/platform/web/detect.py
+index 7a3d3de..dec7bc6 100644
+--- a/platform/web/detect.py
++++ b/platform/web/detect.py
+@@ -277,7 +277,7 @@ def configure(env: "SConsEnvironment"):
+         env.Append(CCFLAGS=["-sUSE_PTHREADS=1"])
+         env.Append(LINKFLAGS=["-sUSE_PTHREADS=1"])
+         env.Append(LINKFLAGS=["-sDEFAULT_PTHREAD_STACK_SIZE=%sKB" % env["default_pthread_stack_size"]])
+-        env.Append(LINKFLAGS=["-sPTHREAD_POOL_SIZE=\"Module['emscriptenPoolSize']||24\""])
++        env.Append(LINKFLAGS=["-sPTHREAD_POOL_SIZE=0"] if env["module_mono_enabled"] else ["-sPTHREAD_POOL_SIZE=\"Module['emscriptenPoolSize']||24\""])
+         env.Append(LINKFLAGS=["-sWASM_MEM_MAX=2048MB"])
+         if not env["dlink_enabled"]:
+             # Workaround https://github.com/emscripten-core/emscripten/issues/21844#issuecomment-2116936414.
+diff --git a/platform/web/js/engine/config.js b/platform/web/js/engine/config.js
+index 06705ab..665797d 100644
+--- a/platform/web/js/engine/config.js
++++ b/platform/web/js/engine/config.js
+@@ -279,10 +279,8 @@ const InternalConfig = function (initConfig) { // eslint-disable-line no-unused-
+ 	/**
+ 	 * @ignore
+ 	 * @param {string} loadPath
+-	 * @param {Response} response
+ 	 */
+-	Config.prototype.getModuleConfig = function (loadPath, response) {
+-		let r = response;
++	Config.prototype.getModuleConfig = function (loadPath) {
+ 		const gdext = this.gdextensionLibs;
+ 		return {
+ 			'print': this.onPrint,
+@@ -291,20 +289,6 @@ const InternalConfig = function (initConfig) { // eslint-disable-line no-unused-
+ 			'noExitRuntime': false,
+ 			'dynamicLibraries': [`${loadPath}.side.wasm`].concat(this.gdextensionLibs),
+ 			'emscriptenPoolSize': this.emscriptenPoolSize,
+-			'instantiateWasm': function (imports, onSuccess) {
+-				function done(result) {
+-					onSuccess(result['instance'], result['module']);
+-				}
+-				if (typeof (WebAssembly.instantiateStreaming) !== 'undefined') {
+-					WebAssembly.instantiateStreaming(Promise.resolve(r), imports).then(done);
+-				} else {
+-					r.arrayBuffer().then(function (buffer) {
+-						WebAssembly.instantiate(buffer, imports).then(done);
+-					});
+-				}
+-				r = null;
+-				return {};
+-			},
+ 			'locateFile': function (path) {
+ 				if (!path.startsWith('godot.')) {
+ 					return path;
+diff --git a/platform/web/js/engine/engine.js b/platform/web/js/engine/engine.js
+index 1aeeb62..9c304c5 100644
+--- a/platform/web/js/engine/engine.js
++++ b/platform/web/js/engine/engine.js
+@@ -86,25 +86,16 @@ const Engine = (function () {
+ 					Engine.load(basePath, this.config.fileSizes[`${basePath}.wasm`]);
+ 				}
+ 				const me = this;
+-				function doInit(promise) {
+-					// Care! Promise chaining is bogus with old emscripten versions.
+-					// This caused a regression with the Mono build (which uses an older emscripten version).
+-					// Make sure to test that when refactoring.
+-					return new Promise(function (resolve, reject) {
+-						promise.then(function (response) {
+-							const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });
+-							Godot(me.config.getModuleConfig(loadPath, cloned)).then(function (module) {
+-								const paths = me.config.persistentPaths;
+-								module['initFS'](paths).then(function (err) {
+-									me.rtenv = module;
+-									if (me.config.unloadAfterInit) {
+-										Engine.unload();
+-									}
+-									resolve();
+-								});
+-							});
+-						});
+-					});
++				async function doInit(promise) {
++					const response = await promise;
++					const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });
++					const host = await import(new URL(`${loadPath}.dotnet/host.mjs`, document.baseURI).href);
++					const module = await host['createGodot'](me.config.getModuleConfig(loadPath), cloned);
++					await module['initFS'](me.config.persistentPaths);
++					me.rtenv = module;
++					if (me.config.unloadAfterInit) {
++						Engine.unload();
++					}
+ 				}
+ 				preloader.setProgressFunc(this.config.onProgress);
+ 				initPromise = doInit(loadPromise);

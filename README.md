@@ -30,34 +30,30 @@ A release archive contains these files:
 
 - `web_debug.zip` and `web_release.zip`.
 - Four matching local Godot NuGet packages.
-- `patch-export.py`, which applies the remaining post-export change from the
-  upstream Draft.
+- `assemble-export.py` for assembling the Web export.
 - Godot and .NET license notices.
 - A manifest and SHA-256 checksums.
 
 The archive does not contain a custom Godot editor. Users and this repository
 do not compile one.
 
-Kirie performs .NET Web export as separate, reproducible steps:
+Use the patched NuGet packages as a restore source. Publish for `browser-wasm`,
+then export a PCK from the same build with the `dotnet` custom feature.
 
-1. The Kirie CLI runs `dotnet publish` for `browser-wasm` outside Godot with
-   the patched local SDK and verifies the output with a SHA-512 manifest.
-2. The user's existing configured official Godot Mono/.NET editor runs
-   `--export-pack Web`.
-3. Kirie's GDScript export plugin adds the `dotnet` feature, a C# stub, and
-   `res://.godot/mono/publish/wasm32` to the PCK during that pack export.
-4. The CLI assembles the HTML, JavaScript, WebAssembly, and PCK files outside
-   Godot from the custom template, then applies the recorded post-export patch.
+```sh
+python3 assemble-export.py --template web_debug.zip \
+  --publish path/to/publish --pack path/to/game.pck --output site/game.html
+```
 
-`kirie doctor fix` can install the matching templates, NuGet packages, and
-patch in the Kirie cache. It does not replace the user's Godot editor or
-install a second editor.
+Copy application web assets to `site/`, preserving their paths.
+Kirie CLI 0.14.1 does not support this export format yet.
 
 The current templates have these limits:
 
 - They require WebAssembly threads and cross-origin isolation.
 - They use `optimize=none` and `lto=none`.
-- They target .NET 10.
+- They require .NET 10.0.12.
+- Jiterpreter traces are disabled.
 - They use invariant globalization.
 - Only Chromium has browser test evidence.
 - Some .NET browser APIs do not work.
@@ -87,7 +83,7 @@ Cross-Origin-Embedder-Policy: require-corp
 The page must report `crossOriginIsolated === true`.
 Cross-origin resources must also meet the browser's CORS or CORP requirements.
 
-Install the matching templates, SDK packages, and `patch-export.py` together.
+Install the matching templates, SDK packages, and `assemble-export.py` together.
 The NuGet version remains `4.7.2`. An existing NuGet cache can contain the previous
 single-threaded SDK under that version. When you switch releases, use a fresh
 `NUGET_PACKAGES` directory. Then restore and publish the project again.
